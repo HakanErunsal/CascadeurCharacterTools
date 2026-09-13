@@ -1,0 +1,59 @@
+﻿name: Build release ZIP
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Download repository
+        uses: actions/checkout@v7
+
+      - name: Build installer ZIP
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $folderName = "CascadeurCharacterTools-$tag"
+          $stage = Join-Path "dist" $folderName
+
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+
+          Get-ChildItem -Force |
+            Where-Object {
+              $_.Name -notin @(
+                ".git",
+                ".github",
+                "dist",
+                "Exports",
+                "__pycache__"
+              )
+            } |
+            Copy-Item -Destination $stage -Recurse -Force
+
+          Get-ChildItem $stage -Recurse -Directory -Filter "__pycache__" |
+            Remove-Item -Recurse -Force
+
+          Get-ChildItem $stage -Recurse -File -Include "*.pyc","*.pyo" |
+            Remove-Item -Force
+
+          Compress-Archive `
+            -Path $stage `
+            -DestinationPath "dist\$folderName.zip"
+
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" `
+            "dist\CascadeurCharacterTools-${{ github.ref_name }}.zip" `
+            --verify-tag `
+            --generate-notes `
+            --title "${{ github.ref_name }}"
