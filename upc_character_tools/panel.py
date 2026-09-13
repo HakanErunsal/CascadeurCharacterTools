@@ -8,6 +8,22 @@ from . import core
 _engine=None
 _model=None
 
+def default_export_dir():
+    locations=[
+        QtCore.QStandardPaths.writableLocation(QtCore.QStandardPaths.DocumentsLocation),
+        QtCore.QStandardPaths.writableLocation(QtCore.QStandardPaths.DownloadLocation),
+        str(Path.home()),
+    ]
+    for location in locations:
+        if not location:continue
+        path=Path(location)/'CascadeurCharacterTools'/'Exports'
+        try:
+            path.mkdir(parents=True,exist_ok=True)
+            return path
+        except OSError:
+            pass
+    return Path.home()
+
 def current_scene():
     view=csc.app.get_application().get_scene_manager().current_scene()
     if view is None:raise ValueError('Open a Cascadeur scene first.')
@@ -21,8 +37,7 @@ class PanelModel(QtCore.QObject):
         self._selection='Select any control on one character.'
         self._status='Ready'
         self._busy=False
-        self.export_dir=Path(__file__).resolve().parents[1]/'Exports'
-        self.export_dir.mkdir(exist_ok=True)
+        self.export_dir=default_export_dir()
         self.timer=QtCore.QTimer(self)
         self.timer.timeout.connect(self.refresh)
         self.timer.start(700)

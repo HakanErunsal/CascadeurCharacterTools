@@ -35,7 +35,7 @@ The exporter finds the complete character automatically, exports all 89 joints p
 
 Use **Use existing root heading** when the root joint itself already contains the heading you want to normalize. The body-facing mode is the intended default for the offset/turned second character in paired animations.
 
-Every FBX receives an adjacent `.export.json` report containing the source character, frame interval, original starting transform, detected heading, frame rate, and normalized root path. Exports made from the panel default to the `Exports` folder beside this README.
+Every FBX receives an adjacent `.export.json` report containing the source character, frame interval, original starting transform, detected heading, frame rate, and normalized root path. Exports made from the panel default to `Documents/CascadeurCharacterTools/Exports` for the current Windows user. If Documents is unavailable, the tool tries Downloads and then the user profile folder.
 
 ## Scope
 
