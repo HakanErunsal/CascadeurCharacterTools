@@ -89,6 +89,11 @@ class PanelModel(QtCore.QObject):
             frames=scene.get_layers_selector().selection().frames_interval();first,last=frames.first,frames.last
             stem=core.re.sub(r'[^A-Za-z0-9_-]+','_',rig['label'])
             suggestion=self.export_dir/f'{stem}_{first}_{last}.fbx'
+            scene_path=csc.app.get_application().get_scene_manager().current_scene().get_path_name()
+            if scene_path:
+                source=Path(scene_path)
+                if source.is_absolute() and source.suffix.lower()=='.casc':
+                    suggestion=source.with_suffix('.fbx')
             mode='body' if heading==0 else 'root'
             def save(path):
                 if not path:return
