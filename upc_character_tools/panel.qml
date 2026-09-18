@@ -5,8 +5,8 @@ import QtQuick.Layouts
 
 Window {
     id: window
-    width: 460; height: 560
-    minimumWidth: 410; minimumHeight: 540
+    width: 460; height: 620
+    minimumWidth: 410; minimumHeight: 600
     title: "Manny Character Tools"
     color: "#25282e"
     visible: true
@@ -80,15 +80,31 @@ Window {
             ToolTip.visible: hovered
             ToolTip.text: "Body facing extracts root yaw from the pelvis while preserving the pose. Existing root heading keeps your authored root rotations."
         }
+        RowLayout {
+            Layout.fillWidth: true
+            Label { text: "FPS"; color: "#e0e4eb" }
+            TextField {
+                id: fps; Layout.fillWidth: true; placeholderText: "scene setting"; selectByMouse: true; enabled: !toolModel.busy
+                ToolTip.visible: hovered
+                ToolTip.text: "Expected frame rate. The FBX is baked at the scene's Frame rate setting; typing a value makes the export fail if the scene disagrees."
+            }
+        }
         Button {
             text: "Export Selected"; Layout.fillWidth: true
             enabled: !toolModel.busy
-            onClicked: toolModel.exportSelected(heading.currentIndex)
+            onClicked: toolModel.exportSelected(heading.currentIndex, fps.text)
         }
         Label {
             text: "Starts at origin. Preserves motion after the start frame.\nExports your selected interval, including both ends."
             color: "#aeb8c7"; wrapMode: Text.WordWrap
             Layout.fillWidth: true; font.pixelSize: 12
+        }
+        Button {
+            text: "Nativize Selected"; Layout.fillWidth: true
+            enabled: !toolModel.busy
+            onClicked: toolModel.nativizeSelected()
+            ToolTip.visible: hovered
+            ToolTip.text: "Removes the character prefix from every joint, control and mesh of the selected character so Live Link bone names match the Unreal skeleton."
         }
         Item { Layout.fillHeight: true }
         Label { text: toolModel.status; color: "#91d4bd"; wrapMode: Text.WordWrap; Layout.fillWidth: true }

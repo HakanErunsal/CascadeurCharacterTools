@@ -169,6 +169,27 @@ def add_character(scene, name, offset=(0.0, 0.0, 0.0), yaw_degrees=0.0):
         raise RuntimeError('Unexpected character object count after insertion.')
     return new_rig
 
+def nativize_character(scene, rig=None):
+    """Strip the character prefix from every object of one character so joint names match the Unreal skeleton."""
+    rig = rig or resolve_character(scene)
+    mv = scene.model_viewer()
+    root_name = mv.get_object_name(rig['root'])
+    if ':' not in root_name:
+        raise ValueError(f"{rig['label']} already uses native names.")
+    prefix = root_name.rsplit(':', 1)[0] + ':'
+    names = {o: mv.get_object_name(o) for o in mv.get_objects()}
+    targets = {o: n[len(prefix):] for o, n in names.items() if n.startswith(prefix)}
+    others = {n for o, n in names.items() if o not in targets}
+    clashes = sorted(set(targets.values()) & others)
+    if clashes:
+        raise ValueError('Another object already uses the native name ' + ', '.join(clashes[:5]) + (' and more' if len(clashes) > 5 else '') + '. Keep one native character per scene.')
+    def mod(model, update, su, session):
+        for o, name in targets.items():
+            model.set_object_name(o, name)
+    if not scene.modify_update_with_session('Nativize: ' + rig['label'], mod):
+        raise RuntimeError('Cascadeur could not rename the character. See the Event Log; the operation was not completed.')
+    return dict(label=rig['label'], count=len(targets))
+
 def yaw_matrix(angle):
     c, s = math.cos(angle), math.sin(angle)
     return np.array([[c,0,s],[0,1,0],[-s,0,c]], dtype=float)
@@ -242,16 +263,26 @@ def correct_fbx(raw_path, output, transforms, metadata):
     if axes.get('UpAxis') != [1] or axes.get('UnitScaleFactor') != [1.0]:
         raise ValueError('Expected Y-up, centimetre FBX output.')
     models = doc.models(); names = [short_name(n) for n in models]
-    expected_names = sorted(REFERENCE['bones'] + ['SKM_Manny_Simple'])
-    if sorted(names) != expected_names:
-        raise ValueError('FBX does not contain exactly one complete Manny skeleton and its wrapper.')
+    bones = set(REFERENCE['bones'])
+    bone_names = sorted(n for n in names if n in bones)
+    others = [n for n in names if n not in bones]
+    if bone_names != sorted(bones) or len(others) != 1:
+        from collections import Counter
+        got, want = Counter(bone_names), Counter(bones)
+        missing = sorted((want - got).elements())
+        extra = sorted((got - want).elements())
+        raise ValueError(
+            'FBX does not contain exactly one complete Manny skeleton and its wrapper. '
+            f'Found {len(names)} nodes. Missing bones: {missing}. Duplicate bones: {extra}. Non-bone nodes: {others}.')
     by_name = dict(zip(names, models)); parents = doc.parent_ids()
-    wrapper = by_name['SKM_Manny_Simple']; root = by_name['root']
+    wrapper = by_name[others[0]]; root = by_name['root']
     if parents.get(root.values[0]) != wrapper.values[0] or parents.get(wrapper.values[0],0) != 0:
         raise ValueError('Unexpected export root hierarchy.')
-    for node in models:
+    names = ['SKM_Manny_Simple' if n == others[0] else n for n in names]
+    by_name = dict(zip(names, models))
+    for node, name in zip(models, names):
         old = node.values[1]
-        node.set_value(1, short_name(node) + old[old.index('\x00'):])
+        node.set_value(1, name + old[old.index('\x00'):])
     for n in models:
         p = model_properties(n)
         if any(abs(x-1) > 1e-4 for x in p.get('Lcl Scaling',[1,1,1])):
@@ -315,16 +346,34 @@ def fbx_frame_rate(path):
     return fps
 
 def scene_frame_rate(view):
-    """Read the scene FPS without depending on the user's FBX export preset."""
+    """Best-effort read of the scene FPS. Returns None when no known setting form answers; the export then trusts the FBX Cascadeur bakes and reports the measured rate."""
     handler=view.get_setting_handler()
-    for getter in (handler.get_int_value,handler.get_float_value):
-        try:
-            fps=float(getter('Data','FPS'))
-            if fps>0:return fps
-        except (RuntimeError,TypeError,ValueError):
-            pass
-    # UPC execution scenes and Cascadeur's Manny sample use 30 fps.
-    return 30.0
+    for getter in (handler.get_float_value,handler.get_int_value):
+        for args in (('SceneSettings','FPS'),('Scene','FPS'),('Data','FPS'),('SceneSettings/FPS',),('Scene/FPS',),('Data/FPS',),('FPS',)):
+            try:
+                fps=float(getter(*args))
+                if fps>0:return fps
+            except Exception:
+                pass
+    for owner in (view,csc.app.get_application().get_scene_manager().current_scene()):
+        for name in ('get_fps','fps','get_frame_rate','frame_rate'):
+            try:
+                attr=getattr(owner,name)
+                fps=float(attr() if callable(attr) else attr)
+                if fps>0:return fps
+            except Exception:
+                pass
+    return None
+
+def scene_fbx_loader(scene,view,fps):
+    """The FBX loader Cascadeur's own export uses, which bakes at the scene frame rate. Falls back to a private loader when the tool is unavailable."""
+    try:
+        tool=csc.app.get_application().get_tools_manager().get_tool('FbxSceneLoader')
+        loader=tool.get_fbx_loader(csc.app.get_application().get_scene_manager().current_scene())
+        if loader is not None:return loader
+    except Exception:
+        pass
+    return csc.fbx.FbxLoader(fps or 30.0,scene.get_event_log_or_null(),view)
 
 def export_with_clean_wrapper_parent(scene, view, wrapper, loader, path):
     """Export with the skeletal wrapper temporarily detached from UI-only groups."""
@@ -356,7 +405,7 @@ def export_with_clean_wrapper_parent(scene, view, wrapper, loader, path):
             raise RuntimeError('Cascadeur failed while preparing the Manny hierarchy for export.') from export_error[0]
         raise RuntimeError('Cascadeur could not temporarily prepare the Manny hierarchy for export.')
 
-def export_character(scene, path, rig=None, first=None, last=None, heading_mode='body'):
+def export_character(scene, path, rig=None, first=None, last=None, heading_mode='body', fps=None):
     if heading_mode not in ('body','root'):
         raise ValueError('Unknown heading mode.')
     rig = rig or resolve_character(scene)
@@ -397,10 +446,9 @@ def export_character(scene, path, rig=None, first=None, last=None, heading_mode=
             scene.selector().select(export_objects,rig['root'],csc.domain.SelectorFilter.Free)
             layers=list(scene.layers_viewer().layer_ids_by_obj_ids(list(export_objects)))
             scene.get_layers_selector().set_full_selection_by_parts(layers,first,last)
-            # Use one private loader so the user's FBX preset cannot block this
-            # export or be changed by it.
-            fps=scene_frame_rate(view)
-            loader=csc.fbx.FbxLoader(fps,scene.get_event_log_or_null(),view)
+            requested=float(fps) if fps else None
+            detected=scene_frame_rate(view)
+            loader=scene_fbx_loader(scene,view,requested or detected)
             settings=csc.fbx.FbxSettings()
             settings.mode=csc.fbx.FbxSettingsMode.Binary
             settings.up_axis=csc.fbx.FbxSettingsAxis.Y
@@ -416,7 +464,17 @@ def export_character(scene, path, rig=None, first=None, last=None, heading_mode=
             raise RuntimeError('Source scene path unexpectedly changed.')
         if not raw.is_file() or raw.stat().st_size<100:
             raise RuntimeError('Cascadeur did not produce an FBX. Check the Event Log.')
-        correct_fbx(raw,fixed,transforms,metadata)
+        try:
+            correct_fbx(raw,fixed,transforms,metadata)
+        except ValueError:
+            import shutil
+            shutil.copy2(raw,path.with_suffix('.failed_raw.fbx'))
+            raise
+        measured=metadata.get('frame_rate')
+        metadata['frame_rate_requested']=requested
+        metadata['frame_rate_detected']=detected
+        if requested and measured and abs(measured-requested)>0.01:
+            raise RuntimeError(f"The scene is at {measured:g} fps, not {requested:g}. Set Frame rate to {requested:g} in Scene Settings (the timeline fps field is display only) and export again.")
         temporary_report=Path(temp)/'normalized.export.json'
         temporary_report.write_text(json.dumps(metadata,indent=2),encoding='utf-8')
         os.replace(fixed,path)

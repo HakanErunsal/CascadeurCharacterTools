@@ -29,13 +29,26 @@ The name must start with a letter and may contain letters, numbers, spaces, `_`,
 1. Select any mesh, skeleton joint, point control, or AutoPosing control belonging to one character.
 2. Select the required frame interval in the Timeline.
 3. Keep **Body facing → root motion** for paired execution animations and click **Export Selected**.
-4. Choose an FBX filename. Reusing a name safely replaces the older export after the new file passes validation.
+4. Leave **FPS** empty to write the scene's frame rate into the FBX, or type one to force it. The export stops if it cannot read the scene setting or if the baked FBX disagrees with it.
+5. Choose an FBX filename. Reusing a name safely replaces the older export after the new file passes validation.
 
 The exporter finds the complete character automatically, exports all 89 joints plus the skeletal mesh wrapper, moves the first root position to the origin, and makes the starting body direction neutral while retaining the motion that follows. The operation restores the original object selection, timeline selection, and current frame. It does not save or modify the source `.casc` file.
 
 Use **Use existing root heading** when the root joint itself already contains the heading you want to normalize. The body-facing mode is the intended default for the offset/turned second character in paired animations.
 
 Every FBX receives an adjacent `.export.json` report containing the source character, frame interval, original starting transform, detected heading, frame rate, and normalized root path. For saved scenes, the export dialog defaults to the current `.casc` file's folder and filename, with an `.fbx` extension. For unsaved scenes, exports default to `Documents/CascadeurCharacterTools/Exports` for the current Windows user. If Documents is unavailable, the tool tries Downloads and then the user profile folder.
+
+The wrapper node is written to the FBX as `SKM_Manny_Simple` whatever the character is called in the scene, so a renamed character imports against the same Unreal skeleton. If validation rejects the FBX, the message names the missing bones, the duplicated bones, and any unexpected nodes, and the unvalidated file is kept next to the target as `.failed_raw.fbx` so you can open it and see what Cascadeur produced.
+
+## Nativize Selected
+
+Live Link to Unreal needs the joint names to match the Unreal skeleton exactly (`root`, `pelvis`, `clavicle_l`). A character added with this panel carries its name as a prefix (`Player:clavicle_l`), and Cascadeur's Live Link sender corrupts some of those names on the way out, which shows up in the Unreal log as `Track with name Player:clavicle_l does not exist`.
+
+1. Select any joint, mesh, point, or AutoPosing control belonging to the character.
+2. Click **Nativize Selected**.
+3. Disconnect and reconnect the Live Link source so Cascadeur resends the bone list.
+
+The tool finds the whole character from the selection and removes the prefix from every one of its objects in one undoable operation. It stops if another object in the scene already uses one of the resulting names, so keep one native character per scene. Export Selected and Add Character keep working on a nativized character.
 
 ## Scope
 

@@ -82,8 +82,15 @@ class PanelModel(QtCore.QObject):
             return 'Added '+core.add_character(current_scene(),name,offset,angle)['label']+'. Undo removes this addition.'
         self.action(operation)
 
-    @QtCore.Slot(int)
-    def exportSelected(self,heading):
+    @QtCore.Slot()
+    def nativizeSelected(self):
+        def operation():
+            result=core.nativize_character(current_scene())
+            return f"Renamed {result['count']} objects of {result['label']} to native Unreal names. Reconnect Live Link so Cascadeur resends the bone list. Undo restores the prefix."
+        self.action(operation)
+
+    @QtCore.Slot(int,str)
+    def exportSelected(self,heading,fps_text):
         try:
             scene=current_scene();rig=core.resolve_character(scene)
             frames=scene.get_layers_selector().selection().frames_interval();first,last=frames.first,frames.last
@@ -95,6 +102,11 @@ class PanelModel(QtCore.QObject):
                 if source.is_absolute() and source.suffix.lower()=='.casc':
                     suggestion=source.with_suffix('.fbx')
             mode='body' if heading==0 else 'root'
+            fps_text=(fps_text or '').strip()
+            fps=None
+            if fps_text:
+                fps=float(fps_text)
+                if fps<=0:raise ValueError('FPS must be a positive number, or empty to read the scene setting.')
             def save(path):
                 if not path:return
                 self.export_dir=Path(path).parent
