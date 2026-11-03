@@ -1,5 +1,13 @@
 # Validation record
 
+## v1.0.9 (export at standard size, Details-style panel)
+
+Validated on 2026-11-03:
+
+- Ran the size normalization on a Scale 1.5 export (`AS_UPC_Sword_Execute_A_Victim`). Measured scale was 1.5000000; after normalization every bone rest offset matched the Scale 1 example FBX within 0.000003 cm, and every bone translation key equalled the original divided by 1.5 within 0.000003 cm.
+- Rendered the redesigned QML panel with Qt Quick Controls Basic and a stub model; all rows, fields, the dropdown, the checkbox label and the status bar laid out at the default 440 px width.
+- Installed with `Install.exe --install` into Cascadeur 2026.2.
+
 ## v1.0.8 — character scale
 
 Validated in Cascadeur 2026.2 on 2026-11-03 using isolated scratch scenes:

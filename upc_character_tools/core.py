@@ -270,7 +270,31 @@ def sample_export(scene, rig, first, last, heading_mode):
         original_position_cm=initial_position.tolist(),original_heading_degrees=float(math.degrees(headings[0])),
         root_path_cm=expected)
 
-def correct_fbx(raw_path, output, transforms, metadata):
+def skeleton_scale(by_name):
+    """Size of an exported skeleton relative to the bundled Manny, measured from its rest bone offsets."""
+    length = sum(float(np.linalg.norm(model_properties(by_name[b]).get('Lcl Translation',[0,0,0])))
+                 for b in REFERENCE['bones'] if b != 'root')
+    return length/REFERENCE['rest_length_cm']
+
+def normalize_size(doc, by_name, transforms, factor):
+    """Multiply every bone rest offset and translation key by factor."""
+    for name in REFERENCE['bones']:
+        node = by_name[name]
+        rest = model_properties(node).get('Lcl Translation')
+        if rest is not None:
+            set_model_vector(node,'Lcl Translation',[v*factor for v in rest])
+        # Root and its direct children get their curves rewritten from transforms afterwards.
+        if name in transforms:
+            continue
+        for curve in doc.curves(node.values[0],'Lcl Translation').values():
+            keys = curve.child('KeyValueFloat')
+            keys.set_value(0,[v*factor for v in keys.values[0]])
+            default = curve.child('Default')
+            if default: default.set_value(0,default.values[0]*factor)
+    for data in transforms.values():
+        data['position'] = data['position']*factor
+
+def correct_fbx(raw_path, output, transforms, metadata, normalize=True):
     doc = Document(raw_path)
     axes = model_properties(doc.top('GlobalSettings'))
     if axes.get('UpAxis') != [1] or axes.get('UnitScaleFactor') != [1.0]:
@@ -307,6 +331,13 @@ def correct_fbx(raw_path, output, transforms, metadata):
             doc.set_curve(wrapper.values[0],prop,axis,[vec[i]]*count)
     set_model_vector(wrapper,'PreRotation',[-90,0,0])
     set_model_vector(wrapper,'PostRotation',[0,0,0])
+    scale = skeleton_scale(by_name)
+    normalized = normalize and abs(scale-1) > 1e-4
+    metadata['character_scale'] = round(scale, 4)
+    metadata['normalized_to_manny_size'] = normalized
+    if normalized:
+        normalize_size(doc, by_name, transforms, 1/scale)
+        metadata['root_path_cm'] = (np.asarray(metadata['root_path_cm'])/scale).tolist()
     for name, data in transforms.items():
         node = by_name[name]
         props = model_properties(node)
@@ -418,7 +449,7 @@ def export_with_clean_wrapper_parent(scene, view, wrapper, loader, path):
             raise RuntimeError('Cascadeur failed while preparing the Manny hierarchy for export.') from export_error[0]
         raise RuntimeError('Cascadeur could not temporarily prepare the Manny hierarchy for export.')
 
-def export_character(scene, path, rig=None, first=None, last=None, heading_mode='body', fps=None):
+def export_character(scene, path, rig=None, first=None, last=None, heading_mode='body', fps=None, normalize=True):
     if heading_mode not in ('body','root'):
         raise ValueError('Unknown heading mode.')
     rig = rig or resolve_character(scene)
@@ -478,7 +509,7 @@ def export_character(scene, path, rig=None, first=None, last=None, heading_mode=
         if not raw.is_file() or raw.stat().st_size<100:
             raise RuntimeError('Cascadeur did not produce an FBX. Check the Event Log.')
         try:
-            correct_fbx(raw,fixed,transforms,metadata)
+            correct_fbx(raw,fixed,transforms,metadata,normalize)
         except ValueError:
             import shutil
             shutil.copy2(raw,path.with_suffix('.failed_raw.fbx'))

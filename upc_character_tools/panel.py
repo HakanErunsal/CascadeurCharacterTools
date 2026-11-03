@@ -90,8 +90,8 @@ class PanelModel(QtCore.QObject):
             return f"Renamed {result['count']} objects of {result['label']} to native Unreal names. Reconnect Live Link so Cascadeur resends the bone list. Undo restores the prefix."
         self.action(operation)
 
-    @QtCore.Slot(int,str)
-    def exportSelected(self,heading,fps_text):
+    @QtCore.Slot(int,str,bool)
+    def exportSelected(self,heading,fps_text,normalize=True):
         try:
             scene=current_scene();rig=core.resolve_character(scene)
             frames=scene.get_layers_selector().selection().frames_interval();first,last=frames.first,frames.last
@@ -112,8 +112,10 @@ class PanelModel(QtCore.QObject):
                 if not path:return
                 self.export_dir=Path(path).parent
                 def operation():
-                    result=core.export_character(scene,path,rig,first,last,mode)
-                    return f"Exported {Path(path).name}\n{result['frames']} frames · {result['bone_count']} bones · starts at origin"
+                    result=core.export_character(scene,path,rig,first,last,mode,fps,normalize)
+                    scale=result['character_scale']
+                    size=f" · scaled {scale:g} → 1" if result['normalized_to_manny_size'] else (f" · kept at scale {scale:g}" if scale!=1 else '')
+                    return f"Exported {Path(path).name}\n{result['frames']} frames · {result['bone_count']} bones · starts at origin{size}"
                 self.action(operation)
             csc.app.get_application().get_file_dialog_manager().show_save_file_dialog('Export Manny animation',str(suggestion),['*.fbx'],save)
         except Exception as e:self._status=str(e);self.changed.emit()

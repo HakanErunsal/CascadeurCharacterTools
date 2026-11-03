@@ -123,5 +123,6 @@
     "upperarm_twist_01_r",
     "upperarm_twist_02_l",
     "upperarm_twist_02_r"
-  ]
+  ],
+  "rest_length_cm": 1224.0908358623626
 }

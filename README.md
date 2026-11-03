@@ -11,9 +11,15 @@ This panel is built for multi-character UE5 Manny animation scenes. It adds a co
 
 The installer validates the selected Cascadeur folder and copies a self-contained version of the tool into it. The project folder can be moved or deleted after installation. `Install.cmd` remains available as a fallback.
 
+To rebuild `Install.exe` on Windows, run `./Build-Installer.ps1` in PowerShell. It embeds `assets/manny-tools.ico`, which includes sizes from 16 to 256 pixels. The original artwork is saved as `assets/manny-tools.png`.
+
+## Panel
+
+The panel follows the Unreal Details panel layout: collapsible **Add Character**, **Export** and **Live Link** categories, one setting per row. Hover a row for a description of the setting. The status bar at the bottom shows the result of the last action.
+
 ## Add Character
 
-Enter a unique name such as `Enemy_02`, optionally enter an initial Unreal X/Y/Z offset in centimetres, a yaw angle in degrees, and a uniform **Scale**, then click **Add Character**. X/Y/Z and yaw default to `0`; scale defaults to `1`. For example, `X 0, Y 200, Z 0, Yaw 180, Scale 2` adds a character twice Manny's size, places it 200 cm along Unreal Y, and turns it around. Scale must be a finite number greater than zero; an empty scale field uses `1`. The operation:
+Enter a unique name such as `Enemy_02`, optionally enter a starting **Location** in Unreal centimetres (X/Y/Z), a **Rotation (Yaw)** in degrees, and a uniform **Scale**, then click **Add Character**. X/Y/Z and yaw default to `0`; scale defaults to `1`. For example, `X 0, Y 200, Z 0, Yaw 180, Scale 2` adds a character twice Manny's size, places it 200 cm along Unreal Y, and turns it around. Scale must be a finite number greater than zero; an empty scale field uses `1`. The operation:
 
 - inserts the full UE5 Manny Simple mesh, 89-joint skeleton, point rig, and AutoPosing setup;
 - prefixes the character's objects with the chosen name;
@@ -24,19 +30,20 @@ Enter a unique name such as `Enemy_02`, optionally enter an initial Unreal X/Y/Z
 
 The name must start with a letter and may contain letters, numbers, spaces, `_`, or `-`.
 
-Scale changes the new character's physical dimensions before placement. It leaves other characters unchanged and keeps bone transform scales at `1`. Export Selected preserves the resized skeleton and mesh; use a matching skeleton or retarget the animation in Unreal when its proportions differ from your target. The location offset stays in centimetres regardless of scale.
+Scale changes the new character's physical dimensions before placement. It leaves other characters unchanged and keeps bone transform scales at `1`. Export Selected writes the character back at standard Manny size by default (see below), so the animation plays on the normal Unreal skeleton and the actor's scale in Unreal restores the size. The location offset stays in centimetres regardless of scale.
 
 ## Export Selected
 
 1. Select any mesh, skeleton joint, point control, or AutoPosing control belonging to one character.
 2. Select the required frame interval in the Timeline.
-3. Keep **Body facing → root motion** for paired execution animations and click **Export Selected**.
-4. Leave **FPS** empty to write the scene's frame rate into the FBX, or type one to force it. The export stops if it cannot read the scene setting or if the baked FBX disagrees with it.
-5. Choose an FBX filename. Reusing a name safely replaces the older export after the new file passes validation.
+3. Keep **Root Motion** on **Body Facing** for paired execution animations.
+4. Leave **Frame Rate** empty to write the scene's frame rate into the FBX, or type one to force it. The export stops if it cannot read the scene setting or if the baked FBX disagrees with it.
+5. Keep **Standard Size** checked to export a character added with a Scale other than 1 at normal size. The tool measures the character's scale from its skeleton and divides every bone offset and root motion by it, so a Scale 1.5 enemy exports like a normal Manny and plays at full size on an actor scaled 1.5 in Unreal. Clear it to export the skeleton at its scene size. The report records the measured `character_scale` and whether it was normalized.
+6. Click **Export Selected** and choose an FBX filename. Reusing a name safely replaces the older export after the new file passes validation.
 
 The exporter finds the complete character automatically, exports all 89 joints plus the skeletal mesh wrapper, moves the first root position to the origin, and makes the starting body direction neutral while retaining the motion that follows. The operation restores the original object selection, timeline selection, and current frame. It does not save or modify the source `.casc` file.
 
-Use **Use existing root heading** when the root joint itself already contains the heading you want to normalize. The body-facing mode is the intended default for the offset/turned second character in paired animations.
+Use **Root Heading** when the root joint itself already contains the heading you want to normalize. The body-facing mode is the intended default for the offset/turned second character in paired animations.
 
 Every FBX receives an adjacent `.export.json` report containing the source character, frame interval, original starting transform, detected heading, frame rate, and normalized root path. For saved scenes, the export dialog defaults to the current `.casc` file's folder and filename, with an `.fbx` extension. For unsaved scenes, exports default to `Documents/CascadeurCharacterTools/Exports` for the current Windows user. If Documents is unavailable, the tool tries Downloads and then the user profile folder.
 
