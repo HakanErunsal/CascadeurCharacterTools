@@ -9,6 +9,7 @@ import tempfile
 import numpy as np
 import csc
 from .fbx_binary import Document, short_name, model_properties, set_model_vector
+from .scaling import character_part, scale_animation
 
 HERE = Path(__file__).parent
 REFERENCE = json.loads((HERE / 'reference.json').read_text())
@@ -77,7 +78,7 @@ def validate_manny(scene, rig):
     if len(names) != len(set(names)) or sorted(names) != REFERENCE['bones']:
         raise ValueError('This rig differs from the bundled UE5 Manny Simple skeleton (89 joints). Export was stopped.')
 
-def add_character(scene, name, offset=(0.0, 0.0, 0.0), yaw_degrees=0.0):
+def add_character(scene, name, offset=(0.0, 0.0, 0.0), yaw_degrees=0.0, scale=1.0):
     name = name.strip()
     if not re.fullmatch(r'[A-Za-z][A-Za-z0-9_ -]{0,47}', name):
         raise ValueError('Use a name starting with a letter, followed by letters, numbers, spaces, _ or - (48 characters maximum).')
@@ -87,6 +88,9 @@ def add_character(scene, name, offset=(0.0, 0.0, 0.0), yaw_degrees=0.0):
     yaw_degrees = float(yaw_degrees)
     if offset.shape != (3,) or not np.all(np.isfinite(offset)) or not math.isfinite(yaw_degrees):
         raise ValueError('Initial position and yaw must contain finite numbers.')
+    scale = float(scale)
+    if not math.isfinite(scale) or scale <= 0:
+        raise ValueError('Scale must be a finite number greater than zero.')
     # Inputs follow Unreal's X/Y/Z convention. Cascadeur is Y-up, so Unreal
     # Y maps to Cascadeur Z and Unreal Z maps to Cascadeur Y.
     scene_offset = np.asarray([offset[0], offset[2], offset[1]], dtype=float)
@@ -95,9 +99,10 @@ def add_character(scene, name, offset=(0.0, 0.0, 0.0), yaw_degrees=0.0):
     def mod(model, update, su, session):
         lv = scene.layers_viewer()
         root_folder = lv.root_id()
-        ids, groups = csc.parts.Buffer.get().insert_objects_by_path(PART, update.root().group_id(), model, scene.assets_manager())
+        ids, groups = csc.parts.Buffer.get().insert_objects_by_path(part, update.root().group_id(), model, scene.assets_manager())
         if len(ids) != 341:
             raise RuntimeError('Manny template did not insert completely.')
+        scale_animation(scene, ids, update, scale)
         mv, bv = scene.model_viewer(), scene.behaviour_viewer()
         object_keys = {mv.get_object_name(j)+'|'+str(not bv.get_behaviour_by_name(j,'MeshObject').is_null()):j for j in ids}
         top_rig = next(j for j in ids if mv.get_object_name(j).split(':')[-1] == 'Rig(0)')
@@ -163,8 +168,16 @@ def add_character(scene, name, offset=(0.0, 0.0, 0.0), yaw_degrees=0.0):
             su.run_update(changed, frame)
         session.take_selector().select({rig['root']}, rig['root'], csc.domain.SelectorFilter.Free)
         new_rig.update(rig)
-    if not scene.modify_update_with_session('Add Manny: '+name, mod):
-        raise RuntimeError('Cascadeur could not add Manny. See the Event Log; the operation was not completed.')
+    current_frame = scene.get_current_frame()
+    with character_part(HERE, PART, scale) as part:
+        try:
+            # The part has one template frame. Initialize AutoPosing there before
+            # evaluating the new character at the user's current frame.
+            scene.set_current_frame(0)
+            if not scene.modify_update_with_session('Add Manny: '+name, mod):
+                raise RuntimeError('Cascadeur could not add Manny. See the Event Log; the operation was not completed.')
+        finally:
+            scene.set_current_frame(current_frame)
     if len(set(scene.model_viewer().get_objects()) - before) != 341:
         raise RuntimeError('Unexpected character object count after insertion.')
     return new_rig

@@ -69,17 +69,18 @@ class PanelModel(QtCore.QObject):
             print(traceback.format_exc())
         finally:self._busy=False;self.changed.emit();self.refresh()
 
-    @QtCore.Slot(str,str,str,str,str)
-    def addCharacter(self,name,x,y,z,yaw):
-        def number(value,label):
-            try: result=float(value.strip() or '0')
+    @QtCore.Slot(str,str,str,str,str,str)
+    def addCharacter(self,name,x,y,z,yaw,scale='1'):
+        def number(value,label,default='0'):
+            try: result=float(value.strip() or default)
             except ValueError: raise ValueError(label+' must be a number.')
             if not core.math.isfinite(result):raise ValueError(label+' must be a finite number.')
             return result
         def operation():
             offset=[number(x,'X'),number(y,'Y'),number(z,'Z')]
             angle=number(yaw,'Yaw')
-            return 'Added '+core.add_character(current_scene(),name,offset,angle)['label']+'. Undo removes this addition.'
+            size=number(scale,'Scale','1')
+            return 'Added '+core.add_character(current_scene(),name,offset,angle,size)['label']+'. Undo removes this addition.'
         self.action(operation)
 
     @QtCore.Slot()

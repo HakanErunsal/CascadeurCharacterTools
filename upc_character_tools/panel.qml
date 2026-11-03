@@ -51,24 +51,26 @@ Window {
             placeholderText: "Character name, e.g. Enemy_02"
             selectByMouse: true
             enabled: !toolModel.busy
-            onAccepted: toolModel.addCharacter(text, offsetX.text, offsetY.text, offsetZ.text, yaw.text)
+            onAccepted: toolModel.addCharacter(text, offsetX.text, offsetY.text, offsetZ.text, yaw.text, characterScale.text)
         }
         Label { text: "Initial transform (Unreal cm / degrees)"; color: "#aeb8c7"; font.pixelSize: 12 }
         GridLayout {
-            Layout.fillWidth: true; columns: 4; columnSpacing: 8; rowSpacing: 4
+            Layout.fillWidth: true; columns: 5; columnSpacing: 8; rowSpacing: 4
             Label { text: "X"; color: "#e0e4eb" }
             Label { text: "Y"; color: "#e0e4eb" }
             Label { text: "Z"; color: "#e0e4eb" }
             Label { text: "Yaw°"; color: "#e0e4eb" }
+            Label { text: "Scale"; color: "#e0e4eb" }
             TextField { id: offsetX; Layout.fillWidth: true; text: "0"; selectByMouse: true; enabled: !toolModel.busy }
             TextField { id: offsetY; Layout.fillWidth: true; text: "0"; selectByMouse: true; enabled: !toolModel.busy }
             TextField { id: offsetZ; Layout.fillWidth: true; text: "0"; selectByMouse: true; enabled: !toolModel.busy }
             TextField { id: yaw; Layout.fillWidth: true; text: "0"; selectByMouse: true; enabled: !toolModel.busy }
+            TextField { id: characterScale; Layout.fillWidth: true; text: "1"; selectByMouse: true; enabled: !toolModel.busy }
         }
         Button {
             text: "Add Character"; Layout.fillWidth: true
             enabled: !toolModel.busy
-            onClicked: toolModel.addCharacter(nameInput.text, offsetX.text, offsetY.text, offsetZ.text, yaw.text)
+            onClicked: toolModel.addCharacter(nameInput.text, offsetX.text, offsetY.text, offsetZ.text, yaw.text, characterScale.text)
         }
         Rectangle { Layout.fillWidth: true; height: 1; color: "#515761" }
         Label { text: toolModel.selection; color: "#e0e4eb"; wrapMode: Text.WordWrap; Layout.fillWidth: true }

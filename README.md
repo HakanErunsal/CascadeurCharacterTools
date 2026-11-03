@@ -13,16 +13,18 @@ The installer validates the selected Cascadeur folder and copies a self-containe
 
 ## Add Character
 
-Enter a unique name such as `Enemy_02`, optionally enter an initial Unreal X/Y/Z offset in centimetres and a yaw angle in degrees, then click **Add Character**. All four transform fields default to `0`, so `X 0, Y 200, Z 0, Yaw 180` places the second character 200 cm along Unreal Y and turns it around. The operation:
+Enter a unique name such as `Enemy_02`, optionally enter an initial Unreal X/Y/Z offset in centimetres, a yaw angle in degrees, and a uniform **Scale**, then click **Add Character**. X/Y/Z and yaw default to `0`; scale defaults to `1`. For example, `X 0, Y 200, Z 0, Yaw 180, Scale 2` adds a character twice Manny's size, places it 200 cm along Unreal Y, and turns it around. Scale must be a finite number greater than zero; an empty scale field uses `1`. The operation:
 
 - inserts the full UE5 Manny Simple mesh, 89-joint skeleton, point rig, and AutoPosing setup;
 - prefixes the character's objects with the chosen name;
-- places and turns the complete character, including its mesh, skeleton, and AutoPosing controls;
+- resizes, places, and turns the complete character, including its mesh, skeleton, AutoPosing controls, and collision shapes;
 - groups the character in the Outliner;
 - recreates the bundled Manny track layout inside a named track folder;
 - remains one undoable Cascadeur operation.
 
 The name must start with a letter and may contain letters, numbers, spaces, `_`, or `-`.
+
+Scale changes the new character's physical dimensions before placement. It leaves other characters unchanged and keeps bone transform scales at `1`. Export Selected preserves the resized skeleton and mesh; use a matching skeleton or retarget the animation in Unreal when its proportions differ from your target. The location offset stays in centimetres regardless of scale.
 
 ## Export Selected
 
@@ -52,5 +54,5 @@ The tool finds the whole character from the selection and removes the prefix fro
 
 ## Scope
 
-This version deliberately accepts only Cascadeur's bundled UE5 Manny Simple skeleton: exactly 89 uniquely named joints. It stops with a clear message for mixed-character selections, incomplete rigs, scaled rigs, or invalid ranges.
+This version deliberately accepts only Cascadeur's bundled UE5 Manny Simple skeleton: exactly 89 uniquely named joints. It stops with a clear message for mixed-character selections, incomplete rigs, non-unit bone transform scales, or invalid ranges. Characters resized with Add Character retain unit bone scales and can be exported.
 

@@ -1,5 +1,25 @@
 # Validation record
 
+## v1.0.8 — character scale
+
+Validated in Cascadeur 2026.2 on 2026-11-03 using isolated scratch scenes:
+
+- Added characters at scale 0.5, 1.5, and 2, with Unreal X/Y offsets and yaw 135 degrees.
+- Compared all 89 joint positions and orientations against a default-size character at the same placement, on frames 0 and 7. Maximum position error was 0.000458 cm.
+- Compared every skinned mesh position against the expected resized mesh. Maximum error was 0.000435 cm.
+- Confirmed all bone transform scales remain `[1, 1, 1]` and the original character's mesh remains unchanged within solver precision.
+- Exported frames 0–2 for each resized character through Export Selected; every FBX passed the existing 89-joint, root-motion, and frame-count checks.
+- Rejected zero, negative, NaN, and infinite scales before adding scene objects.
+- Verified a scaled addition is removed by a single Undo action.
+- Opened the QML panel and exercised its actual Add Character button with Scale 2; verified the resulting 341-object character and approximately 323 cm root-to-head height.
+- Initialized additions at frame 0 and restored the current frame, including when adding at frame 7.
+
+Run `validate_scale.py` inside Cascadeur to repeat the numerical, mesh, export, and invalid-input checks. The script creates a scratch scene and restores the previously active scene when finished.
+
+Resized exports retain their resized skeleton and mesh. Retargeting and playback against a different Unreal skeleton remain project-specific.
+
+## Original release validation
+
 Tested with Cascadeur 2026.2.0.16422 on this machine and the project scene:
 
 `AS_Unarmed_Execution.casc`
